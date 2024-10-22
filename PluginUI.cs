@@ -1,6 +1,7 @@
 using System;
 using System.Linq;
 using System.Numerics;
+using System.Text;
 using Dalamud.Interface;
 using Dalamud.Interface.Utility;
 using FFXIVClientStructs.FFXIV.Client.UI.Misc;
@@ -33,18 +34,18 @@ public static class PluginUI
         if (!isVisible) return;
 
         ImGui.SetNextWindowSizeConstraints(new Vector2(700, 600) * ImGuiHelpers.GlobalScale, new Vector2(9999));
-        ImGui.Begin("ReAction Configuration", ref isVisible);
+        ImGui.Begin("ReAction配置", ref isVisible);
         ImGuiEx.AddDonationHeader();
 
         if (ImGui.BeginTabBar("ReActionTabs"))
         {
-            if (ImGui.BeginTabItem("Stacks"))
+            if (ImGui.BeginTabItem("预设"))
             {
                 DrawStackList();
                 ImGui.EndTabItem();
             }
 
-            if (ImGui.BeginTabItem("Other Settings"))
+            if (ImGui.BeginTabItem("更多设置"))
             {
                 ImGui.BeginChild("OtherSettings");
                 DrawOtherSettings();
@@ -52,13 +53,13 @@ public static class PluginUI
                 ImGui.EndTabItem();
             }
 
-            if (ImGui.BeginTabItem("Custom Placeholders"))
+            if (ImGui.BeginTabItem("自定义占位符"))
             {
                 DrawCustomPlaceholders();
                 ImGui.EndTabItem();
             }
 
-            if (ImGui.BeginTabItem("Help"))
+            if (ImGui.BeginTabItem("帮助"))
             {
                 DrawStackHelp();
                 ImGui.EndTabItem();
@@ -81,7 +82,7 @@ public static class PluginUI
 
         if (ImGui.Button(FontAwesomeIcon.Plus.ToIconString(), buttonSize))
         {
-            ReAction.Config.ActionStacks.Add(new() { Name = "New Stack" });
+            ReAction.Config.ActionStacks.Add(new() { Name = "新预设" });
             ReAction.Config.Save();
         }
 
@@ -90,7 +91,7 @@ public static class PluginUI
         if (ImGui.Button(FontAwesomeIcon.SignOutAlt.ToIconString(), buttonSize) && hasSelectedStack)
             ImGui.SetClipboardText(Configuration.ExportActionStack(CurrentStack));
         ImGui.PopFont();
-        ImGuiEx.SetItemTooltip("Export stack to clipboard.");
+        ImGuiEx.SetItemTooltip("将预设导出到剪贴板");
         ImGui.PushFont(UiBuilder.IconFont);
 
         ImGui.SameLine();
@@ -105,11 +106,11 @@ public static class PluginUI
             }
             catch (Exception e)
             {
-                DalamudApi.PrintError($"Failed to import stack from clipboard!\n{e.Message}");
+                DalamudApi.PrintError($"从剪贴板导入预设失败!\n{e.Message}");
             }
         }
         ImGui.PopFont();
-        ImGuiEx.SetItemTooltip("Import stack from clipboard.");
+        ImGuiEx.SetItemTooltip("从剪贴板导入预设");
         ImGui.PushFont(UiBuilder.IconFont);
 
         ImGui.SameLine();
@@ -151,7 +152,7 @@ public static class PluginUI
             ReAction.Config.Save();
         }
 
-        var firstColumnWidth = 250 * ImGuiHelpers.GlobalScale;
+        var firstColumnWidth = 300 * ImGuiHelpers.GlobalScale;
         ImGui.PushStyleColor(ImGuiCol.Border, ImGui.GetColorU32(ImGuiCol.TabActive));
         ImGui.BeginChild("ReActionPresetList", new Vector2(firstColumnWidth, ImGui.GetContentRegionAvail().Y / 2), true);
         ImGui.PopStyleColor();
@@ -191,7 +192,7 @@ public static class PluginUI
     {
         var save = false;
 
-        save |= ImGui.InputText("Name", ref stack.Name, 64);
+        save |= ImGui.InputText("名称", ref stack.Name, 64);
         save |= ImGui.CheckboxFlags("##Shift", ref stack.ModifierKeys, 1);
         ImGuiEx.SetItemTooltip("Shift");
         ImGui.SameLine();
@@ -202,14 +203,14 @@ public static class PluginUI
         ImGuiEx.SetItemTooltip("Alt");
         ImGui.SameLine();
         save |= ImGui.CheckboxFlags("##Exact", ref stack.ModifierKeys, 8);
-        ImGuiEx.SetItemTooltip("Match exactly these modifiers. E.g. Shift + Control ticked will match Shift + Control held, but not Shift + Control + Alt held.");
+        ImGuiEx.SetItemTooltip("精确匹配这些修饰键位,例如:Shift + Control不会触发Shift + Control + Alt的");
         ImGui.SameLine();
-        ImGui.TextUnformatted("Modifier Keys");
-        save |= ImGui.Checkbox("Block Original on Stack Fail", ref stack.BlockOriginal);
-        save |= ImGui.Checkbox("Fail if Out of Range", ref stack.CheckRange);
-        save |= ImGui.Checkbox("Fail if On Cooldown", ref stack.CheckCooldown);
-        ImGuiEx.SetItemTooltip("Will fail if the action would fail to queue due to cooldown. Which is either" +
-            "\n> 0.5s left on the cooldown, or < 0.5s since the last use (Charges / GCD).");
+        ImGui.TextUnformatted("修饰键位");
+        save |= ImGui.Checkbox("如果重定向失败,阻止原技能", ref stack.BlockOriginal);
+        save |= ImGui.Checkbox("如果超出范围,则判定为失败", ref stack.CheckRange);
+        save |= ImGui.Checkbox("如果技能在冷却,则判定为失败", ref stack.CheckCooldown);
+        ImGuiEx.SetItemTooltip("如果操作因冷却而无法排队，则判定为失败. 包括:" +
+            "\n冷却时间> 0.5s 或者距离上次用< 0.5s(充能 / GCD).");
 
         if (save)
             ReAction.Config.Save();
@@ -223,9 +224,9 @@ public static class PluginUI
 
     private static string FormatActionRow(Action a) => a.RowId switch
     {
-        0 => "All Actions",
-        1 => "All Harmful Actions",
-        2 => "All Beneficial Actions",
+        0 => "所有技能",
+        1 => "所有伤害技能",
+        2 => "所有增益技能",
         _ => $"[#{a.RowId} {a.ClassJob.Value?.Abbreviation}{(a.IsPvP ? " PVP" : string.Empty)}] {a.Name}"
     };
 
@@ -268,7 +269,7 @@ public static class PluginUI
 
             ImGui.SameLine();
 
-            if (ImGui.Checkbox("Adjust ID", ref action.UseAdjustedID))
+            if (ImGui.Checkbox("调整技能ID", ref action.UseAdjustedID))
                 ReAction.Config.Save();
             var detectedAdjustment = false;
             unsafe
@@ -276,10 +277,10 @@ public static class PluginUI
                 if (!action.UseAdjustedID && (detectedAdjustment = Common.ActionManager->CS.GetAdjustedActionId(action.ID) != action.ID))
                     ImGui.GetWindowDrawList().AddRectFilled(ImGui.GetItemRectMin(), ImGui.GetItemRectMax(), 0x2000FF30, ImGui.GetStyle().FrameRounding);
             }
-            ImGuiEx.SetItemTooltip("Allows the action to match any other action that it transforms into." +
-                "\nE.g. Aero will match Dia, Play will match all cards, Diagnosis will match Eukrasian Diagnosis, etc." +
-                "\nEnable this for skills that upgrade. Disable this for compatibility with certain XIVCombos." +
-                (detectedAdjustment ? "\n\nThis action is currently adjusted due to a trait, combo or plugin. This option is recommended." : string.Empty));
+            ImGuiEx.SetItemTooltip("允许该技能与它转换为的任何其他技能相匹配。" +
+                "\n例如疾风会匹配天辉,出卡会匹配所有的卡,诊断会匹配均衡诊断等." +
+                "\n启用此项对会升级的技能好用,但如果你有XIVCombos等连击插件,要禁用这个." +
+                (detectedAdjustment ? "\n\n这个技能目前因为职业特性/连击/其他插件而被转换了,推荐你勾选这个." : string.Empty));
 
             ImGui.SameLine();
 
@@ -303,7 +304,7 @@ public static class PluginUI
 
     private static string FormatOverrideActionRow(Action a) => a.RowId switch
     {
-        0 => "Same Action",
+        0 => "同个技能",
         _ => $"[#{a.RowId} {a.ClassJob.Value?.Abbreviation}{(a.IsPvP ? " PVP" : string.Empty)}] {a.Name}"
     };
 
@@ -383,47 +384,47 @@ public static class PluginUI
     {
         var save = false;
 
-        if (ImGuiEx.BeginGroupBox("Actions", 0.5f))
+        if (ImGuiEx.BeginGroupBox("技能", 0.5f))
         {
-            save |= ImGui.Checkbox("Enable Turbo Hotbar Keybinds", ref ReAction.Config.EnableTurboHotbars);
+            save |= ImGui.Checkbox("按住按键连发", ref ReAction.Config.EnableTurboHotbars);
             ImGuiEx.SetItemTooltip("Allows you to hold hotbar keybinds (no controller support).\nWARNING: Text macros may be spammed.");
 
             using (ImGuiEx.DisabledBlock.Begin(!ReAction.Config.EnableTurboHotbars))
             {
                 ImGuiEx.Prefix(false);
-                save |= ImGui.DragInt("Interval", ref ReAction.Config.TurboHotbarInterval, 0.5f, 0, 1000, "%d ms");
+                save |= ImGui.DragInt("频率", ref ReAction.Config.TurboHotbarInterval, 0.5f, 0, 1000, "%d ms");
 
                 ImGuiEx.Prefix(false);
-                save |= ImGui.DragInt("Start Delay", ref ReAction.Config.InitialTurboHotbarInterval, 0.5f, 0, 1000, "%d ms");
+                save |= ImGui.DragInt("启动延迟", ref ReAction.Config.InitialTurboHotbarInterval, 0.5f, 0, 1000, "%d ms");
 
                 ImGuiEx.Prefix(true);
-                save |= ImGui.Checkbox("Enable Out of Combat##Turbo", ref ReAction.Config.EnableTurboHotbarsOutOfCombat);
+                save |= ImGui.Checkbox("脱战时也生效##Turbo", ref ReAction.Config.EnableTurboHotbarsOutOfCombat);
             }
 
-            save |= ImGui.Checkbox("Enable Instant Ground Targets", ref ReAction.Config.EnableInstantGroundTarget);
-            ImGuiEx.SetItemTooltip("Ground targets will immediately place themselves at your current cursor position when a stack does not override the target.");
+            save |= ImGui.Checkbox("地面目标施法", ref ReAction.Config.EnableInstantGroundTarget);
+            ImGuiEx.SetItemTooltip("当预设中没有重定向的目标时，地面目标将立即将自己放置在当前光标位置。");
 
             using (ImGuiEx.DisabledBlock.Begin(!ReAction.Config.EnableInstantGroundTarget))
             {
                 ImGuiEx.Prefix(true);
-                save |= ImGui.Checkbox("Block Miscellaneous Ground Targets", ref ReAction.Config.EnableBlockMiscInstantGroundTargets);
-                ImGuiEx.SetItemTooltip("Disables the previous option from activating on actions such as placing pets.");
+                save |= ImGui.Checkbox("阻止特殊地面目标技能", ref ReAction.Config.EnableBlockMiscInstantGroundTargets);
+                ImGuiEx.SetItemTooltip("禁止在放置宠物等操作时激活上一个选项。");
             }
 
-            save |= ImGui.Checkbox("Enable Enhanced Auto Face Target", ref ReAction.Config.EnableEnhancedAutoFaceTarget);
-            ImGuiEx.SetItemTooltip("Actions that don't require facing a target will no longer automatically face the target, such as healing.");
+            save |= ImGui.Checkbox("智能咏唱技能面向", ref ReAction.Config.EnableEnhancedAutoFaceTarget);
+            ImGuiEx.SetItemTooltip("不需要面对目标的动作将不再自动面对目标，例如治疗。");
 
-            save |= ImGui.Checkbox("Enable Camera Relative Directional Actions", ref ReAction.Config.EnableCameraRelativeDirectionals);
-            ImGuiEx.SetItemTooltip("Changes channeled and directional actions, such as Passage of Arms or Surpanakha,\nto be relative to the direction your camera is facing, rather than your character.");
+            save |= ImGui.Checkbox("智能范围技能面向", ref ReAction.Config.EnableCameraRelativeDirectionals);
+            ImGuiEx.SetItemTooltip("将直线型和方向型的技能(例如武装戍卫和穿甲散弹)改为摄像机方向施法而不是角色面向方向.");
 
-            save |= ImGui.Checkbox("Enable Camera Relative Dashes", ref ReAction.Config.EnableCameraRelativeDashes);
-            ImGuiEx.SetItemTooltip("Changes dashes, such as En Avant and Elusive Jump, to be relative\nto the direction your camera is facing, rather than your character.");
+            save |= ImGui.Checkbox("智能位移技能面向", ref ReAction.Config.EnableCameraRelativeDashes);
+            ImGuiEx.SetItemTooltip("将各种位移技能(例如前冲步和回避跳跃)改为摄像机方向施法而不是角色面向方向.");
 
             using (ImGuiEx.DisabledBlock.Begin(!ReAction.Config.EnableCameraRelativeDashes))
             {
                 ImGuiEx.Prefix(true);
-                save |= ImGui.Checkbox("Block Backward Dashes", ref ReAction.Config.EnableNormalBackwardDashes);
-                ImGuiEx.SetItemTooltip("Disables the previous option for any backward dash, such as Elusive Jump.");
+                save |= ImGui.Checkbox("阻止后跳", ref ReAction.Config.EnableNormalBackwardDashes);
+                ImGuiEx.SetItemTooltip("禁止上述特性对后跳类技能生效,例如回避跳跃.");
             }
 
             ImGuiEx.EndGroupBox();
@@ -431,31 +432,31 @@ public static class PluginUI
 
         ImGui.SameLine();
 
-        if (ImGuiEx.BeginGroupBox("Auto", 0.5f))
+        if (ImGuiEx.BeginGroupBox("自动化", 0.5f))
         {
-            save |= ImGui.Checkbox("Enable Auto Dismount", ref ReAction.Config.EnableAutoDismount);
+            save |= ImGui.Checkbox("自动下车", ref ReAction.Config.EnableAutoDismount);
             ImGuiEx.SetItemTooltip("Automatically dismounts when an action is used, prior to using the action.");
 
-            save |= ImGui.Checkbox("Enable Auto Cast Cancel", ref ReAction.Config.EnableAutoCastCancel);
+            save |= ImGui.Checkbox("自动中断读条", ref ReAction.Config.EnableAutoCastCancel);
             ImGuiEx.SetItemTooltip("Automatically cancels casting when the target dies.");
 
-            save |= ImGui.Checkbox("Enable Auto Target", ref ReAction.Config.EnableAutoTarget);
-            ImGuiEx.SetItemTooltip("Automatically targets the closest enemy when no target is specified for a targeted attack.");
+            save |= ImGui.Checkbox("自动选中敌人", ref ReAction.Config.EnableAutoTarget);
+            ImGuiEx.SetItemTooltip("当没有指定针对性攻击的目标时，自动瞄准最近的敌人。");
 
             using (ImGuiEx.DisabledBlock.Begin(!ReAction.Config.EnableAutoTarget))
             {
                 ImGuiEx.Prefix(true);
-                save |= ImGui.Checkbox("Enable Auto Change Target", ref ReAction.Config.EnableAutoChangeTarget);
-                ImGuiEx.SetItemTooltip("Additionally targets the closest enemy when your main target is incorrect for a targeted attack.");
+                save |= ImGui.Checkbox("自动改变选中的敌人", ref ReAction.Config.EnableAutoChangeTarget);
+                ImGuiEx.SetItemTooltip("当您的主要目标不适合进行有针对性的攻击时，还会额外瞄准最近的敌人。");
             }
 
             var _ = ReAction.Config.AutoFocusTargetID != 0;
-            if (ImGui.Checkbox("Enable Auto Focus Target", ref _))
+            if (ImGui.Checkbox("自动焦点目标", ref _))
             {
                 ReAction.Config.AutoFocusTargetID = _ ? PronounManager.OrderedIDs.First() : 0;
                 save = true;
             }
-            ImGuiEx.SetItemTooltip("Automatically sets the focus target to the selected target type when possible.");
+            ImGuiEx.SetItemTooltip("在可能的情况下自动将焦点目标设置为选定的目标类型。");
 
             using (ImGuiEx.DisabledBlock.Begin(!_))
             {
@@ -463,19 +464,19 @@ public static class PluginUI
                 save |= DrawTargetTypeCombo("##AutoFocusTargetID", ref ReAction.Config.AutoFocusTargetID);
 
                 ImGuiEx.Prefix(true);
-                save |= ImGui.Checkbox("Enable Out of Combat##AutoFocusTarget", ref ReAction.Config.EnableAutoFocusTargetOutOfCombat);
+                save |= ImGui.Checkbox("脱战时也生效##AutoFocusTarget", ref ReAction.Config.EnableAutoFocusTargetOutOfCombat);
             }
 
-            save |= ImGui.Checkbox("Enable Auto Refocus Target", ref ReAction.Config.EnableAutoRefocusTarget);
-            ImGuiEx.SetItemTooltip("While in duties, attempts to focus target whatever was previously focus targeted if the focus target is lost.");
+            save |= ImGui.Checkbox("自动重选焦点目标", ref ReAction.Config.EnableAutoRefocusTarget);
+            ImGuiEx.SetItemTooltip("执行任务时，若焦点目标丢失，则尝试将焦点转移到先前所关注的任何目标。");
 
-            save |= ImGui.Checkbox("Enable Auto Attacks on Spells", ref ReAction.Config.EnableSpellAutoAttacks);
+            save |= ImGui.Checkbox("启用法师自动攻击", ref ReAction.Config.EnableSpellAutoAttacks);
             ImGuiEx.SetItemTooltip("Causes spells (and some other actions) to start using auto attacks just like weaponskills.");
 
             using (ImGuiEx.DisabledBlock.Begin(!ReAction.Config.EnableSpellAutoAttacks))
             {
                 ImGuiEx.Prefix(true);
-                if (ImGui.Checkbox("Enable Out of Combat##SpellAutos", ref ReAction.Config.EnableSpellAutoAttacksOutOfCombat))
+                if (ImGui.Checkbox("脱战时也生效##SpellAutos", ref ReAction.Config.EnableSpellAutoAttacksOutOfCombat))
                 {
                     if (ReAction.Config.EnableSpellAutoAttacksOutOfCombat)
                         Game.spellAutoAttackPatch.Enable();
@@ -483,39 +484,39 @@ public static class PluginUI
                         Game.spellAutoAttackPatch.Disable();
                     save = true;
                 }
-                ImGuiEx.SetItemTooltip("WARNING: This can cause early pulls on certain bosses!");
+                ImGuiEx.SetItemTooltip("警告:这可能会在面对某些Boss时抢开!");
             }
 
             ImGuiEx.EndGroupBox();
         }
 
-        if (ImGuiEx.BeginGroupBox("Queuing", 0.5f))
+        if (ImGuiEx.BeginGroupBox("队列", 0.5f))
         {
-            if (ImGui.Checkbox("Enable Ground Target Queuing", ref ReAction.Config.EnableGroundTargetQueuing))
+            if (ImGui.Checkbox("地面目标技能进入队列", ref ReAction.Config.EnableGroundTargetQueuing))
             {
                 Game.queueGroundTargetsPatch.Toggle();
                 save = true;
             }
             ImGuiEx.SetItemTooltip("Ground targets will insert themselves into the action queue,\ncausing them to immediately be used as soon as possible, like other OGCDs.");
 
-            save |= ImGui.Checkbox("Enable Queuing More", ref ReAction.Config.EnableQueuingMore);
-            ImGuiEx.SetItemTooltip("Allows sprint, items and LBs to be queued.");
+            save |= ImGui.Checkbox("允许特殊技能进入队列", ref ReAction.Config.EnableQueuingMore);
+            ImGuiEx.SetItemTooltip("允许冲刺/使用道具/极限技进入队列");
 
-            save |= ImGui.Checkbox("Always Queue Macros", ref ReAction.Config.EnableMacroQueue);
+            save |= ImGui.Checkbox("允许宏进入队列", ref ReAction.Config.EnableMacroQueue);
             ImGuiEx.SetItemTooltip("All macros will behave as if /macroqueue was used.");
 
-            save |= ImGui.Checkbox("Enable Queue Adjustments (BETA)", ref ReAction.Config.EnableQueueAdjustments);
+            save |= ImGui.Checkbox("允许队列时间调整 (BETA)", ref ReAction.Config.EnableQueueAdjustments);
             ImGuiEx.SetItemTooltip("Changes how the game handles queuing actions.\nThis is a beta feature, please let me know if anything is not working as expected.");
 
             using (ImGuiEx.DisabledBlock.Begin(!ReAction.Config.EnableQueueAdjustments))
             using (ImGuiEx.ItemWidthBlock.Begin(ImGui.CalcItemWidth() / 2))
             {
                 ImGuiEx.Prefix(false);
-                save |= ImGui.Checkbox("##Enable GCD Adjusted Threshold", ref ReAction.Config.EnableGCDAdjustedQueueThreshold);
+                save |= ImGui.Checkbox("##目前的GCD", ref ReAction.Config.EnableGCDAdjustedQueueThreshold);
                 ImGuiEx.SetItemTooltip("Modifies the threshold based on the current GCD.");
 
                 ImGui.SameLine();
-                save |= ImGui.SliderFloat("Queue Threshold", ref ReAction.Config.QueueThreshold, 0.1f, 2.5f, "%.1f");
+                save |= ImGui.SliderFloat("队列阈值", ref ReAction.Config.QueueThreshold, 0.1f, 2.5f, "%.1f");
                 ImGuiEx.SetItemTooltip("Time remaining on an action's cooldown to allow the game\nto queue up the next one when pressed early. Default: 0.5." +
                     (ReAction.Config.EnableGCDAdjustedQueueThreshold ? $"\nGCD Adjusted Threshold: {ReAction.Config.QueueThreshold * ActionManager.GCDRecast / 2500f}" : string.Empty));
 
@@ -525,17 +526,17 @@ public static class PluginUI
                 using (ImGuiEx.DisabledBlock.Begin(!ReAction.Config.EnableRequeuing))
                 {
                     ImGui.SameLine();
-                    save |= ImGui.SliderFloat("Queue Lock Threshold", ref ReAction.Config.QueueLockThreshold, 0.1f, 2.5f, "%.1f");
+                    save |= ImGui.SliderFloat("队列锁定阈值", ref ReAction.Config.QueueLockThreshold, 0.1f, 2.5f, "%.1f");
                 }
                 ImGui.EndGroup();
                 ImGuiEx.SetItemTooltip("When enabled, allows requeuing until the queued action's cooldown is below this value.");
 
                 ImGuiEx.Prefix(false);
-                save |= ImGui.SliderFloat("Action Lockout", ref ReAction.Config.QueueActionLockout, 0, 2.5f, "%.1f");
+                save |= ImGui.SliderFloat("技能锁定", ref ReAction.Config.QueueActionLockout, 0, 2.5f, "%.1f");
                 ImGuiEx.SetItemTooltip("Blocks the same action from being queued again if it has been on cooldown for less than this value.");
 
                 ImGuiEx.Prefix(true);
-                save |= ImGui.Checkbox("Enable GCD Slidecast Queuing", ref ReAction.Config.EnableSlidecastQueuing);
+                save |= ImGui.Checkbox("启用GCD滑步插入", ref ReAction.Config.EnableSlidecastQueuing);
                 ImGuiEx.SetItemTooltip("Allows the next GCD to be queued during the last 0.5s of a GCD cast.");
             }
 
@@ -544,38 +545,38 @@ public static class PluginUI
 
         ImGui.SameLine();
 
-        if (ImGuiEx.BeginGroupBox("Sunderings", 0.5f))
+        if (ImGuiEx.BeginGroupBox("拆分", 0.5f))
         {
-            save |= ImGui.Checkbox("Sunder Meditation", ref ReAction.Config.EnableDecomboMeditation);
+            save |= ImGui.Checkbox("拆分斗气", ref ReAction.Config.EnableDecomboMeditation);
             ImGuiEx.SetItemTooltip("Removes the Meditation <-> Steel Peak / Forbidden Chakra combo. You will need to use\nthe hotbar feature below to place one of them on your hotbar in order to use them again.\nSteel Peak ID: 25761\nForbidden Chakra ID: 3547");
 
-            save |= ImGui.Checkbox("Sunder Bunshin", ref ReAction.Config.EnableDecomboBunshin);
+            save |= ImGui.Checkbox("拆分分身之术", ref ReAction.Config.EnableDecomboBunshin);
             ImGuiEx.SetItemTooltip("Removes the Bunshin <-> Phantom Kamaitachi combo. You will need to use\nthe hotbar feature below to place it on your hotbar in order to use it again.\nPhantom Kamaitachi ID: 25774");
 
-            save |= ImGui.Checkbox("Sunder Wanderer's Minuet", ref ReAction.Config.EnableDecomboWanderersMinuet);
+            save |= ImGui.Checkbox("拆分放浪神的小步舞曲", ref ReAction.Config.EnableDecomboWanderersMinuet);
             ImGuiEx.SetItemTooltip("Removes the Wanderer's Minuet -> Pitch Perfect combo. You will need to use\nthe hotbar feature below to place it on your hotbar in order to use it again.\nPitch Perfect ID: 7404");
 
-            save |= ImGui.Checkbox("Sunder Liturgy of the Bell", ref ReAction.Config.EnableDecomboLiturgy);
+            save |= ImGui.Checkbox("拆分礼仪之铃", ref ReAction.Config.EnableDecomboLiturgy);
             ImGuiEx.SetItemTooltip("Removes the Liturgy of the Bell combo. You will need to use the hotbar\nfeature below to place it on your hotbar in order to use it again.\nLiturgy of the Bell (Detonate) ID: 28509");
 
-            save |= ImGui.Checkbox("Sunder Earthly Star", ref ReAction.Config.EnableDecomboEarthlyStar);
+            save |= ImGui.Checkbox("拆分地星", ref ReAction.Config.EnableDecomboEarthlyStar);
             ImGuiEx.SetItemTooltip("Removes the Earthly Star combo. You will need to use the hotbar\nfeature below to place it on your hotbar in order to use it again.\nStellar Detonation ID: 8324");
 
-            save |= ImGui.Checkbox("Sunder Minor Arcana", ref ReAction.Config.EnableDecomboMinorArcana);
+            save |= ImGui.Checkbox("拆分小奥秘卡", ref ReAction.Config.EnableDecomboMinorArcana);
             ImGuiEx.SetItemTooltip("Removes the Minor Arcana -> Lord / Lady of Crowns combo. You will need to use the\nhotbar feature below to place one of them on your hotbar in order to use them again.\nLord of Crowns ID: 7444\nLady of Crowns ID: 7445");
 
-            save |= ImGui.Checkbox("Sunder Geirskogul", ref ReAction.Config.EnableDecomboGeirskogul);
+            save |= ImGui.Checkbox("拆分武神枪", ref ReAction.Config.EnableDecomboGeirskogul);
             ImGuiEx.SetItemTooltip("Removes the Geirskogul -> Nastrond combo. You will need to use the\nhotbar feature below to place it on your hotbar in order to use it again.\nNastrond ID: 7400");
 
             ImGuiEx.EndGroupBox();
         }
 
-        if (ImGuiEx.BeginGroupBox("Misc", 0.5f))
+        if (ImGuiEx.BeginGroupBox("杂项", 0.5f))
         {
-            save |= ImGui.Checkbox("Enable Frame Alignment", ref ReAction.Config.EnableFrameAlignment);
+            save |= ImGui.Checkbox("帧率对齐", ref ReAction.Config.EnableFrameAlignment);
             ImGuiEx.SetItemTooltip("Aligns the game's frames with the GCD and animation lock.\nNote: This option will cause an almost unnoticeable stutter when either of these timers ends.");
 
-            if (ImGui.Checkbox("Enable Decimal Waits (Fractionality)", ref ReAction.Config.EnableFractionality))
+            if (ImGui.Checkbox("宏小数等待 (分数)", ref ReAction.Config.EnableFractionality))
             {
                 Game.waitSyntaxDecimalPatch.Toggle();
                 Game.waitCommandDecimalPatch.Toggle();
@@ -583,14 +584,14 @@ public static class PluginUI
             }
             ImGuiEx.SetItemTooltip("Allows decimals in wait commands and removes the 60 seconds cap (e.g. <wait.0.5> or /wait 0.5).");
 
-            if (ImGui.Checkbox("Enable Unassignable Actions in Commands", ref ReAction.Config.EnableUnassignableActions))
+            if (ImGui.Checkbox("在宏中启用原本不能用的技能", ref ReAction.Config.EnableUnassignableActions))
             {
                 Game.allowUnassignableActionsPatch.Toggle();
                 save = true;
             }
             ImGuiEx.SetItemTooltip("Allows using normally unavailable actions in \"/ac\", such as The Forbidden Chakra or Stellar Detonation.");
 
-            save |= ImGui.Checkbox("Enable Player Names in Commands", ref ReAction.Config.EnablePlayerNamesInCommands);
+            save |= ImGui.Checkbox("在宏中启用玩家名称", ref ReAction.Config.EnablePlayerNamesInCommands);
             ImGuiEx.SetItemTooltip("Allows using the \"First Last@World\" syntax for any command requiring a target.");
 
             ImGuiEx.EndGroupBox();
@@ -598,22 +599,22 @@ public static class PluginUI
 
         ImGui.SameLine();
 
-        if (ImGuiEx.BeginGroupBox("Place on Hotbar (HOVER ME FOR INFORMATION)", 0.5f, new ImGuiEx.GroupBoxOptions
+        if (ImGuiEx.BeginGroupBox("热键栏功能 (将鼠标悬停于此以获取信息)", 0.5f, new ImGuiEx.GroupBoxOptions
         {
             HeaderTextAction = () => ImGuiEx.SetItemTooltip(
-                "This will allow you to place various things on the hotbar that you can't normally." +
-                "\nIf you don't know what this can be used for, don't touch it." +
-                "\nSome examples of things you can do:" +
-                "\n\tPlace a certain action on the hotbar to be used with one of the \"Sundering\" features. The IDs are in each setting's tooltip." +
-                "\n\tPlace a certain doze and sit emote on the hotbar (Emote, 88 and 95)." +
-                "\n\tPlace a currency (Item, 1-99) on the hotbar to see how much you have without opening the currency menu." +
-                "\n\tRevive flying mount roulette (GeneralAction, 24).")
+                "这样你就可以将各种通常无法放置在热键栏上的东西放置到热键栏上。" +
+                "\n如果你不知道这有什么用途，就不要碰它。" +
+                "\n以下是您可以采取的一些措施的示例：" +
+                "\n\t将特定操作放在快捷栏上，以便与“拆分”功能之一一起使用。ID 在每个设置的工具提示中。" +
+                "\n\t将特定的打瞌睡和坐下表情放在快捷栏上 (Emote, 88 and 95)." +
+                "\n\t将货币（物品，1-99）放置在快捷栏上，无需打开货币菜单即可查看您有多少货币。" +
+                "\n\t复活飞行坐骑轮盘 (GeneralAction, 24).")
         }))
         {
-            ImGui.Combo("Bar", ref hotbar, "1\02\03\04\05\06\07\08\09\010\0XHB 1\0XHB 2\0XHB 3\0XHB 4\0XHB 5\0XHB 6\0XHB 7\0XHB 8");
-            ImGui.Combo("Slot", ref hotbarSlot, "1\02\03\04\05\06\07\08\09\010\011\012\013\014\015\016");
+            ImGui.Combo("栏序", ref hotbar, "1\02\03\04\05\06\07\08\09\010\0XHB 1\0XHB 2\0XHB 3\0XHB 4\0XHB 5\0XHB 6\0XHB 7\0XHB 8");
+            ImGui.Combo("格序", ref hotbarSlot, "1\02\03\04\05\06\07\08\09\010\011\012\013\014\015\016");
             var hotbarSlotType = Enum.GetName(typeof(RaptureHotbarModule.HotbarSlotType), commandType) ?? commandType.ToString();
-            if (ImGui.BeginCombo("Type", hotbarSlotType))
+            if (ImGui.BeginCombo("类型", hotbarSlotType))
             {
                 for (int i = 1; i <= 32; i++)
                 {
@@ -625,7 +626,7 @@ public static class PluginUI
 
             DrawHotbarIDInput((RaptureHotbarModule.HotbarSlotType)commandType);
 
-            if (ImGui.Button("Execute"))
+            if (ImGui.Button("执行"))
                 Game.SetHotbarSlot(hotbar, hotbarSlot, (byte)commandType, commandID);
             ImGuiEx.EndGroupBox();
         }
@@ -730,12 +731,12 @@ public static class PluginUI
 
     private static unsafe void DrawCustomPlaceholders()
     {
-        if (!ImGui.BeginTable("CustomPronounInfoTable", 3, ImGuiTableFlags.Borders | ImGuiTableFlags.ScrollY)) return;
+        if (!ImGui.BeginTable("自定义占位符", 3, ImGuiTableFlags.Borders | ImGuiTableFlags.ScrollY)) return;
 
         ImGui.TableSetupScrollFreeze(0, 1);
-        ImGui.TableSetupColumn("Name");
-        ImGui.TableSetupColumn("Placeholder");
-        ImGui.TableSetupColumn("Current Target");
+        ImGui.TableSetupColumn("名称");
+        ImGui.TableSetupColumn("占位符");
+        ImGui.TableSetupColumn("当前目标");
         ImGui.TableHeadersRow();
 
         foreach (var (placeholder, pronoun) in PronounManager.CustomPlaceholders)
@@ -750,7 +751,12 @@ public static class PluginUI
             var p = pronoun.GetGameObject();
             if (p == null) continue;
             ImGui.TableNextColumn();
-            ImGui.TextUnformatted(p->NameString);
+            
+            
+            string oriString = p->NameString;
+            byte[] bytes = Encoding.Default.GetBytes(oriString);
+            string newString = Encoding.UTF8.GetString(bytes);
+            ImGui.TextUnformatted(newString);
         }
 
         ImGui.EndTable();
